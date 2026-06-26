@@ -68,6 +68,8 @@ NUMA:
       </pre>
   </details>  
 
+<br>
+
 **Thread types:**
 - **Eventloop thread**: AKA `FastThreadLocalThread` in Netty.
 - **Plarform thread**.
