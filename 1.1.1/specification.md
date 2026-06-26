@@ -92,4 +92,4 @@ NUMA:
 
 **8. Code base:**
 - [Netty-4.2.16.Final-SNAPSHOT](https://github.com/netty/netty/commit/ec4efdbbeebf024b64e0fb782184989835c9ab92).
-- [Netty-allocator](https://github.com/neoionet/netty-allocator/releases/tag/1.1.1.Final).
+- [Netty-allocator-1.1.1.Final](https://github.com/neoionet/netty-allocator/releases/tag/1.1.1.Final).
