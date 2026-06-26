@@ -89,3 +89,7 @@ NUMA:
 
 **7. Benchmark code:**
 - [ByteBufAllocatorAllocPatternBenchmark.java](https://github.com/neoionet/netty-allocator/blob/1.1/benchmark/src/main/java/io/github/neoionet/netty/microbenchmark/ByteBufAllocatorAllocPatternBenchmark.java).
+
+**8. Code base:**
+- [Netty-4.2.16.Final-SNAPSHOT](https://github.com/netty/netty/commit/ec4efdbbeebf024b64e0fb782184989835c9ab92).
+- [Netty-allocator](https://github.com/neoionet/netty-allocator/releases/tag/1.1.1.Final).
