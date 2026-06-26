@@ -1,4 +1,4 @@
-**Chart report:** https://neoionet.github.io/netty-allocator-benchmark-report/1.1.1/benchmark.html.
+**Report:** [Chart](https://neoionet.github.io/netty-allocator-benchmark-report/1.1.1/benchmark.html).
 
 **Servers:**
 <details>
