@@ -1,5 +1,3 @@
-**Report:** [Chart](https://neoionet.github.io/netty-allocator-benchmark-report/1.1.1/benchmark.html).
-
 **Servers:**
 <details>
       <summary> x86 server: 16 cores, 60 GB ram.</summary>
