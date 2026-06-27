@@ -71,7 +71,7 @@ NUMA:
 <br>
 
 **2. Thread types:**
-- `Eventloop thread`: AKA 'FastThreadLocalThread' in Netty.
+- `Eventloop thread`: AKA `FastThreadLocalThread` in Netty.
 - `Platform thread`.
 
 **3. Threads count:**
