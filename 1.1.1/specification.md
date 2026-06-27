@@ -1,5 +1,4 @@
 ---
-layout: bare
 title: Specification
 toc: false
 ---
