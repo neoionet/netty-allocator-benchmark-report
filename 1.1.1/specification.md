@@ -3,17 +3,17 @@ title: Contents
 toc: false
 ---
 
-- [1. Allocaotrs](#0-allocaotrs)
-- [2. Servers](#1-servers)
-- [3. Thread types](#2-thread-types)
-- [4. Threads count](#3-threads-count)
-- [5. Java](#4-java)
-- [6. JVM args](#5-jvm-args)
-- [7. Data](#6-data)
-- [8. Benchmark code](#7-benchmark-code)
-- [9. Code base](#8-code-base)
-- [10. Max live buffers per thread](#9-max-live-buffers-per-thread)
-- [11. Switch on read-write](#10-switch-on-read-write)
+- [1. Allocaotrs](#1-allocaotrs)
+- [2. Servers](#2-servers)
+- [3. Thread types](#3-thread-types)
+- [4. Threads count](#4-threads-count)
+- [5. Java](#5-java)
+- [6. JVM args](#6-jvm-args)
+- [7. Data](#7-data)
+- [8. Benchmark code](#8-benchmark-code)
+- [9. Code base](#9-code-base)
+- [10. Max live buffers per thread](#10-max-live-buffers-per-thread)
+- [11. Switch on read-write](#11-switch-on-read-write)
 
 #### 1. Allocaotrs:
 - [PooledByteBufAllocator](https://github.com/netty/netty/blob/4.2/buffer/src/main/java/io/netty/buffer/PooledByteBufAllocator.java).
