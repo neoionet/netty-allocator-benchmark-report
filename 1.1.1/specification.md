@@ -1,8 +1,7 @@
 ---
-title: Specification
+title: Contents
 toc: false
 ---
-
 - [1. Servers](#1-servers)
 - [2. Thread types](#2-thread-types)
 - [3. Threads count](#3-threads-count)
