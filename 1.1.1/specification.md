@@ -1,3 +1,15 @@
+## Contents
+- [1. Servers](#1-servers)
+- [2. Thread types](#2-thread-types)
+- [3. Threads count](#3-threads-count)
+- [4. Java](#4-java)
+- [5. JVM args](#5-jvm-args)
+- [6. Data](#6-data)
+- [7. Benchmark code](#7-benchmark-code)
+- [8. Code base](#8-code-base)
+- [9. Max live buffers per thread](#9-max-live-buffers-per-thread)
+- [10. Switch on read-write](#10-switch-on-read-write)
+
 #### 1. Servers:
 <details>
       <summary>x86 server: 16 cores, 60 GB ram.</summary>
