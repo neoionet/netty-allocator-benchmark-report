@@ -93,3 +93,10 @@ NUMA:
 **8. Code base:**
 - [Netty-4.2.16.Final-SNAPSHOT](https://github.com/netty/netty/commit/ec4efdbbeebf024b64e0fb782184989835c9ab92).
 - [Netty-allocator-1.1.1.Final](https://github.com/neoionet/netty-allocator/releases/tag/1.1.1.Final).
+
+**9. MAX_LIVE_BUFFERS:**
+- Max live buffers per thread.
+
+**10. enableReadWrite:**  
+- Enable read and write on each buffer, to simulate real-world usage scenarios.
+  
