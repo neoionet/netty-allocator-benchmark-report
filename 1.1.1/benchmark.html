@@ -109,7 +109,7 @@ iframe {
 </nav>
 
 <main>
-  <iframe id="f0" srcdoc='<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0 12px;font-family:system-ui,sans-serif}</style></head><body>
+  <iframe id="f0" data-srcdoc='<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0 12px;font-family:system-ui,sans-serif}</style></head><body>
 <style>
 .ctrl-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem;align-items:flex-end}
 
@@ -213,7 +213,7 @@ s.onload=function(){
 document.head.appendChild(s);
 </script>
 </body></html>' style="display:none" frameborder="0"></iframe>
-  <iframe id="f1" srcdoc='<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0 12px;font-family:system-ui,sans-serif}</style></head><body>
+  <iframe id="f1" data-srcdoc='<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0 12px;font-family:system-ui,sans-serif}</style></head><body>
 <style>
 .ctrl-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem;align-items:flex-end}
 
@@ -318,7 +318,7 @@ s.onload=function(){
 document.head.appendChild(s);
 </script>
 </body></html>' style="display:none" frameborder="0"></iframe>
-  <iframe id="f2" srcdoc='<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0 12px;font-family:system-ui,sans-serif}</style></head><body>
+  <iframe id="f2" data-srcdoc='<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0 12px;font-family:system-ui,sans-serif}</style></head><body>
 <style>
 .ctrl-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem;align-items:flex-end}
 
@@ -423,7 +423,7 @@ s.onload=function(){
 document.head.appendChild(s);
 </script>
 </body></html>' style="display:none" frameborder="0"></iframe>
-  <iframe id="f3" srcdoc='<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0 12px;font-family:system-ui,sans-serif}</style></head><body>
+  <iframe id="f3" data-srcdoc='<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0 12px;font-family:system-ui,sans-serif}</style></head><body>
 <style>
 .ctrl-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem;align-items:flex-end}
 
@@ -537,7 +537,14 @@ const frames = document.querySelectorAll("iframe");
 function show(btn, i) {
   btns.forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
-  frames.forEach((f, j) => f.style.display = j === i ? "block" : "none");
+  frames.forEach((f, j) => {
+    if (j === i) {
+      if (!f.srcdoc) f.srcdoc = f.dataset.srcdoc;
+      f.style.display = "block";
+    } else {
+      f.style.display = "none";
+    }
+  });
 }
 // click first button on laod.
 btns[0].click();
