@@ -75,7 +75,7 @@ NUMA:
 - `Platform thread`.
 
 **3. Threads count:**
-- `32` threads, which equals to 2 × the number of cores, aligned with the default configuration commonly used in production env.
+- `32` threads, which equals to 2 × 16 cores, aligned with the default configuration commonly used in production env.
 
 **4. Java:**
 - `OpenJDK-21.0.11`.
