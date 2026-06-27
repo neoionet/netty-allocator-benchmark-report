@@ -115,7 +115,7 @@ NUMA:
 
 #### 9. Code base:
 - Netty-4.2.16.Final-SNAPSHOT, which compiled based on [ec4efdb](https://github.com/netty/netty/tree/ec4efdbbeebf024b64e0fb782184989835c9ab92).
-- [Netty-mimalloc-allocator-1.1.1.Final](https://github.com/neoionet/netty-allocator/releases/tag/1.1.1.Final).
+- Mimalloc-netty-allocator: https://github.com/neoionet/netty-allocator/releases/tag/1.1.1.Final.
 
 #### 10. Max live buffers per thread: 
 - `MAX_LIVE_BUFFERS`: [128, 1024, 4096, 8192, 16384, 32768, 65536].
