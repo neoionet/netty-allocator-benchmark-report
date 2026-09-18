@@ -68,6 +68,7 @@ Vulnerabilities:
   Tsx async abort:           Not affected
       </pre>
   </details>  
+  <br>
 
 #### 3. Thread types:
 - `Event loop thread`: AKA `FastThreadLocalThread` in Netty.
