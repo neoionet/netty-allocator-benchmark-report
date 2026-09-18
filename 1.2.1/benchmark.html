@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Netty Allocators Benchmark</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  display: flex;
+  height: 100vh;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #e2e8f0;
+}
+
+nav {
+  width: 200px;
+  flex-shrink: 0;
+  border-right: 1px solid #252830;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 12px;
+  gap: 4px;
+}
+
+.logo {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #16191f;
+  padding: 0 4px 16px;
+  border-bottom: 1px solid #252830;
+  margin-bottom: 8px;
+}
+
+.logo span {
+  display: block;
+  font-size: 12px;
+  font-weight: 450;
+  letter-spacing: 0.05em;
+  color: #475569;
+  margin-top: 16px;
+}
+
+.nav-btn {
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  padding: 9px 12px;
+  text-align: left;
+  font-size: 16px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1.4;
+}
+
+.nav-btn:hover {
+  background: #1e2230;
+  color: #cbd5e1;
+}
+
+.nav-btn.active {
+  background: #1e2a40;
+  color: #ffffff;
+}
+
+.nav-btn::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  margin-right: 8px;
+  opacity: 0.6;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: #ffffff;
+}
+
+iframe {
+  width: 100%;
+  flex: 1;
+  border: none;
+}
+
+#loading {
+  position: fixed;
+  inset: 0;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(3px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  gap: 14px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.spinner {
+  width: 42px;
+  height: 42px;
+  border: 4px solid #e2e8f0;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin .75s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="loading">
+  <div class="spinner"></div>
+  <span>loading…</span>
+</div>
+<nav>
+  <div class="logo">Allocator Bench<span>32 threads · 16 cores</span></div>
+
+  <!-- <button class="nav-btn active" onclick="show(this,2)">Eventloop on x86</button> -->
+  <button class="nav-btn active" onclick="show(this,0)">Eventloop on ARM</button>
+  <!-- <button class="nav-btn" onclick="show(this,3)">Platform on x86</button> -->
+  <button class="nav-btn" onclick="show(this,1)">Platform on ARM</button>
+</nav>
+
+<main>
+  <iframe id="f0" data-srcdoc='<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0 12px;font-family:system-ui,sans-serif}</style></head><body>
+<style>
+.ctrl-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem;align-items:flex-end}
+
+.pg{display:flex;border:0.5px solid var(--color-border-secondary, #d1d5db);border-radius:20px;overflow:hidden}
+.pill{padding:5px 14px;font-size:13px;cursor:pointer;background:transparent;border:none;color:var(--color-text-secondary, #4b5563)}
+
+.pill.on{background:var(--color-text-primary, #111827);color:var(--color-background-primary, #ffffff)}
+.slabel{font-size:11px;font-weight:500;color:var(--color-text-tertiary, #6b7280);text-transform:uppercase;margin-bottom:5px}
+.chart-title{font-size:13px;font-weight:500;color:var(--color-text-secondary, #4b5563);margin:1rem 0 4px}
+.cw{position:relative;width:100%;height:260px}
+.leg{display:flex;gap:16px;font-size:12px;color:var(--color-text-secondary, #4b5563);margin-bottom:.5rem}
+.leg span{display:flex;align-items:center;gap:5px}
+.lsq{display:inline-block;width:20px;height:3px;border-radius:2px}
+.warn{background:var(--color-background-warning, #fef08a);border:0.5px solid var(--color-border-warning, #facc15);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--color-text-warning, #854d0e);margin-bottom:1rem;display:none}
+</style>
+
+<div style="padding:18px 0 0">
+<h4 class="sr-only">32 event loop threads on ARM with 16 cores</h4>
+<hr>
+<div class="ctrl-row">
+  <div><div class="slabel">allocation</div>
+    <div class="pg" id="gm">
+      <button class="pill on" data-v="direct">direct</button>
+      <button class="pill" data-v="heap">heap</button>
+    </div></div>
+  <div><div class="slabel">pattern</div>
+    <div class="pg" id="gp">
+      <button class="pill on" data-v="E_COMMERCE">E_COMMERCE</button>
+    </div></div>
+  <div><div class="slabel">read/write</div>
+    <div class="pg" id="gr">
+      <button class="pill on" data-v="true">on</button>
+      <button class="pill" data-v="false">off</button>
+    </div></div>
+</div>
+
+<div class="leg">
+  <span><span class="lsq" style="background:#4a7fcb"></span>POOLED</span>
+  <span><span class="lsq" style="background:#2aaa6e"></span>ADAPTIVE</span>
+  <span><span class="lsq" style="background:#d05a2a"></span>MIMALLOC</span>
+</div>
+
+<div class="chart-title">Latency (ns/op)&nbsp;&nbsp;<span style="font-weight:400;color:var(--color-text-tertiary)">the lower the better</span></div>
+<div class="cw"><canvas id="cL" role="img" aria-label="Allocation latency line chart"></canvas></div>
+
+<div class="chart-title">RSS (MiB)</div>
+<div class="cw"><canvas id="cR" role="img" aria-label="RSS memory line chart"></canvas></div>
+
+<div class="chart-title">allocator used memory (MiB)&nbsp;&nbsp;<span style="font-weight:400;color:var(--color-text-tertiary)">allocator.usedDirectMemory() or allocator.usedHeapMemory()</span></div>
+<div class="cw"><canvas id="cNew" role="img" aria-label="UsedMemory chart"></canvas></div>
+
+</div>
+
+<script>
+const D=[["direct",128,"POOLED","false","E_COMMERCE",357,1971,128],["direct",128,"POOLED","true","E_COMMERCE",246,1980,128],["direct",128,"ADAPTIVE","false","E_COMMERCE",94,2233,142],["direct",128,"ADAPTIVE","true","E_COMMERCE",128,2282,162],["direct",128,"MIMALLOC","false","E_COMMERCE",120,2155,384],["direct",128,"MIMALLOC","true","E_COMMERCE",97,2164,384],["direct",1024,"POOLED","false","E_COMMERCE",377,2465,376],["direct",1024,"POOLED","true","E_COMMERCE",329,2481,384],["direct",1024,"ADAPTIVE","false","E_COMMERCE",138,2532,316],["direct",1024,"ADAPTIVE","true","E_COMMERCE",178,2583,309],["direct",1024,"MIMALLOC","false","E_COMMERCE",90,2289,512],["direct",1024,"MIMALLOC","true","E_COMMERCE",95,2293,512],["direct",4096,"POOLED","false","E_COMMERCE",443,3119,1024],["direct",4096,"POOLED","true","E_COMMERCE",462,3144,1024],["direct",4096,"ADAPTIVE","false","E_COMMERCE",2375,3161,735],["direct",4096,"ADAPTIVE","true","E_COMMERCE",2992,3129,746],["direct",4096,"MIMALLOC","false","E_COMMERCE",91,2811,1024],["direct",4096,"MIMALLOC","true","E_COMMERCE",100,2802,1024],["direct",8192,"POOLED","false","E_COMMERCE",408,3935,1792],["direct",8192,"POOLED","true","E_COMMERCE",688,3934,1788],["direct",8192,"ADAPTIVE","false","E_COMMERCE",3450,3710,1364],["direct",8192,"ADAPTIVE","true","E_COMMERCE",4966,3731,1379],["direct",8192,"MIMALLOC","false","E_COMMERCE",108,3450,1664],["direct",8192,"MIMALLOC","true","E_COMMERCE",117,3456,1664],["direct",16384,"POOLED","false","E_COMMERCE",505,5380,3200],["direct",16384,"POOLED","true","E_COMMERCE",1011,5371,3200],["direct",16384,"ADAPTIVE","false","E_COMMERCE",3945,5100,2670],["direct",16384,"ADAPTIVE","true","E_COMMERCE",4598,5093,2665],["direct",16384,"MIMALLOC","false","E_COMMERCE",147,4742,2944],["direct",16384,"MIMALLOC","true","E_COMMERCE",155,4741,2944],["direct",32768,"POOLED","false","E_COMMERCE",634,8149,5888],["direct",32768,"POOLED","true","E_COMMERCE",1025,8074,5840],["direct",32768,"ADAPTIVE","false","E_COMMERCE",4799,21919,5246],["direct",32768,"ADAPTIVE","true","E_COMMERCE",4114,7800,5193],["direct",32768,"MIMALLOC","false","E_COMMERCE",241,7358,5504],["direct",32768,"MIMALLOC","true","E_COMMERCE",285,7356,5504],["direct",65536,"POOLED","false","E_COMMERCE",1048,13895,11264],["direct",65536,"POOLED","true","E_COMMERCE",1358,13861,11252],["direct",65536,"ADAPTIVE","false","E_COMMERCE",12581,13073,10379],["direct",65536,"ADAPTIVE","true","E_COMMERCE",13398,13039,10355],["direct",65536,"MIMALLOC","false","E_COMMERCE",262,12350,10368],["direct",65536,"MIMALLOC","true","E_COMMERCE",338,12345,10368],["heap",128,"POOLED","false","E_COMMERCE",324,1978,128],["heap",128,"POOLED","true","E_COMMERCE",455,1975,128],["heap",128,"ADAPTIVE","false","E_COMMERCE",104,2223,152],["heap",128,"ADAPTIVE","true","E_COMMERCE",189,2250,162],["heap",128,"MIMALLOC","false","E_COMMERCE",105,2357,384],["heap",128,"MIMALLOC","true","E_COMMERCE",111,2346,384],["heap",1024,"POOLED","false","E_COMMERCE",486,2403,372],["heap",1024,"POOLED","true","E_COMMERCE",392,2425,380],["heap",1024,"ADAPTIVE","false","E_COMMERCE",273,2475,309],["heap",1024,"ADAPTIVE","true","E_COMMERCE",196,2482,319],["heap",1024,"MIMALLOC","false","E_COMMERCE",194,2347,512],["heap",1024,"MIMALLOC","true","E_COMMERCE",195,2366,512],["heap",4096,"POOLED","false","E_COMMERCE",325,3433,1024],["heap",4096,"POOLED","true","E_COMMERCE",684,3466,1024],["heap",4096,"ADAPTIVE","false","E_COMMERCE",2413,17266,751],["heap",4096,"ADAPTIVE","true","E_COMMERCE",2862,17257,758],["heap",4096,"MIMALLOC","false","E_COMMERCE",148,3302,1024],["heap",4096,"MIMALLOC","true","E_COMMERCE",149,3304,1024],["heap",8192,"POOLED","false","E_COMMERCE",436,4384,1792],["heap",8192,"POOLED","true","E_COMMERCE",745,4353,1788],["heap",8192,"ADAPTIVE","false","E_COMMERCE",3417,17970,1371],["heap",8192,"ADAPTIVE","true","E_COMMERCE",3706,17914,1357],["heap",8192,"MIMALLOC","false","E_COMMERCE",180,3276,1664],["heap",8192,"MIMALLOC","true","E_COMMERCE",330,3274,1664],["heap",16384,"POOLED","false","E_COMMERCE",569,6477,3200],["heap",16384,"POOLED","true","E_COMMERCE",746,6398,3200],["heap",16384,"ADAPTIVE","false","E_COMMERCE",3629,19513,2650],["heap",16384,"ADAPTIVE","true","E_COMMERCE",4046,19428,2645],["heap",16384,"MIMALLOC","false","E_COMMERCE",476,5220,2944],["heap",16384,"MIMALLOC","true","E_COMMERCE",354,5217,2944],["heap",32768,"POOLED","false","E_COMMERCE",729,9555,5888],["heap",32768,"POOLED","true","E_COMMERCE",878,9871,5888],["heap",32768,"ADAPTIVE","false","E_COMMERCE",5091,22917,5261],["heap",32768,"ADAPTIVE","true","E_COMMERCE",5707,22758,5225],["heap",32768,"MIMALLOC","false","E_COMMERCE",551,8136,5500],["heap",32768,"MIMALLOC","true","E_COMMERCE",450,8162,5504],["heap",65536,"POOLED","false","E_COMMERCE",929,17917,11260],["heap",65536,"POOLED","true","E_COMMERCE",1183,18135,11264],["heap",65536,"ADAPTIVE","false","E_COMMERCE",13591,22367,10402],["heap",65536,"ADAPTIVE","true","E_COMMERCE",16150,21191,10404],["heap",65536,"MIMALLOC","false","E_COMMERCE",655,14398,10272],["heap",65536,"MIMALLOC","true","E_COMMERCE",540,14408,10368]];
+
+
+const BUFS=[128,1024,4096,8192,16384,32768,65536];
+const AL=["POOLED","ADAPTIVE","MIMALLOC"];
+const CLR={"POOLED":"#4a7fcb","ADAPTIVE":"#2aaa6e","MIMALLOC":"#d05a2a"};
+let st={method:"direct",pattern:"E_COMMERCE",rw:"true"};
+let cL,cR,cNew;
+
+function rows(){return D.filter(r=>r[0]===st.method&&r[3]===st.rw&&r[4]===st.pattern);}
+function ds(col){
+  return AL.map(a=>{
+    const sub=rows().filter(r=>r[2]===a);
+    return{label:a,data:BUFS.map(b=>{const r=sub.find(x=>x[1]===b);return r?r[col]:null;}),
+      borderColor:CLR[a],backgroundColor:CLR[a]+"22",borderWidth:2,
+    };
+  });
+}
+function opts(ytitle){
+  return{responsive:true,maintainAspectRatio:false,animation:{duration:300},
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y!=null?Math.round(c.parsed.y):"n/a"}`}}},
+    scales:{x:{grid:{color:"rgba(128,128,128,.12)"},ticks:{font:{size:11}},title:{display:true,text:"Live buffers",font:{size:11}}},
+            y:{grid:{color:"rgba(128,128,128,.12)"},ticks:{font:{size:11}},title:{display:true,text:ytitle,font:{size:11}}}}};
+}
+function draw(){
+  const lData={labels:BUFS.map(String),datasets:ds(5)};
+  const rData={labels:BUFS.map(String),datasets:ds(6)};
+  const nData={labels:BUFS.map(String),datasets:ds(7)};
+  if(cL){cL.data=lData;cL.update();}
+  if(cR){cR.data=rData;cR.update();}
+  if(cNew){cNew.data=nData;cNew.update();} 
+}
+
+document.querySelectorAll(".pg").forEach(g=>{
+  g.addEventListener("click",e=>{
+    const b=e.target.closest(".pill");if(!b)return;
+    g.querySelectorAll(".pill").forEach(p=>p.classList.remove("on"));
+    b.classList.add("on");
+    const id=g.id;
+    if(id==="gm")st.method=b.dataset.v;
+    if(id==="gp")st.pattern=b.dataset.v;
+    if(id==="gr")st.rw=b.dataset.v;
+    draw();
+  });
+});
+
+function loadChartJS(cb){
+  const CDNS=[
+    "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"
+  ];
+  let done=false;
+  CDNS.forEach(url=>{
+    const s=document.createElement("script");
+    s.src=url;
+    s.onload=()=>{ if(!done){ done=true; cb(); } };
+    document.head.appendChild(s);
+  });
+}
+
+loadChartJS(function(){
+  cL=new Chart(document.getElementById("cL"),{type:"line",data:{labels:BUFS.map(String),datasets:ds(5)},options:opts("ns/op")});
+  cR=new Chart(document.getElementById("cR"),{type:"line",data:{labels:BUFS.map(String),datasets:ds(6)},options:opts("MiB")});
+  cNew = new Chart(document.getElementById("cNew"), {
+      type: "line",
+      data: { labels: BUFS.map(String), datasets: ds(7) },
+      options: opts("MiB")
+    });
+
+  if (window.parent) parent.postMessage("charts-ready", "*");
+});
+</script>
+</body></html>' style="display:none" frameborder="0"></iframe>
+  <iframe id="f1" data-srcdoc='<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0 12px;font-family:system-ui,sans-serif}</style></head><body>
+<style>
+.ctrl-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem;align-items:flex-end}
+
+.pg{display:flex;border:0.5px solid var(--color-border-secondary, #d1d5db);border-radius:20px;overflow:hidden}
+.pill{padding:5px 14px;font-size:13px;cursor:pointer;background:transparent;border:none;color:var(--color-text-secondary, #4b5563)}
+
+.pill.on{background:var(--color-text-primary, #111827);color:var(--color-background-primary, #ffffff)}
+.slabel{font-size:11px;font-weight:500;color:var(--color-text-tertiary, #6b7280);text-transform:uppercase;margin-bottom:5px}
+.chart-title{font-size:13px;font-weight:500;color:var(--color-text-secondary, #4b5563);margin:1rem 0 4px}
+.cw{position:relative;width:100%;height:260px}
+.leg{display:flex;gap:16px;font-size:12px;color:var(--color-text-secondary, #4b5563);margin-bottom:.5rem}
+.leg span{display:flex;align-items:center;gap:5px}
+.lsq{display:inline-block;width:20px;height:3px;border-radius:2px}
+.warn{background:var(--color-background-warning, #fef08a);border:0.5px solid var(--color-border-warning, #facc15);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--color-text-warning, #854d0e);margin-bottom:1rem;display:none}
+</style>
+
+<div style="padding:18px 0 0">
+<h4 class="sr-only">32 platform threads on ARM with 16 cores</h4>
+<hr>
+<div class="ctrl-row">
+  <div><div class="slabel">allocation</div>
+    <div class="pg" id="gm">
+      <button class="pill on" data-v="direct">direct</button>
+      <button class="pill" data-v="heap">heap</button>
+    </div></div>
+  <div><div class="slabel">pattern</div>
+    <div class="pg" id="gp">
+        <button class="pill on" data-v="E_COMMERCE">E_COMMERCE</button>
+    </div></div>
+  <div><div class="slabel">read/write</div>
+    <div class="pg" id="gr">
+      <button class="pill on" data-v="true">on</button>
+      <button class="pill" data-v="false">off</button>
+    </div></div>
+</div>
+
+<div class="leg">
+  <span><span class="lsq" style="background:#4a7fcb"></span>POOLED</span>
+  <span><span class="lsq" style="background:#2aaa6e"></span>ADAPTIVE</span>
+  <span><span class="lsq" style="background:#d05a2a"></span>MIMALLOC</span>
+</div>
+
+<div class="chart-title">Latency (ns/op)&nbsp;&nbsp;<span style="font-weight:400;color:var(--color-text-tertiary)">the lower the better</span></div>
+<div class="cw"><canvas id="cL" role="img" aria-label="Allocation latency line chart"></canvas></div>
+
+<div class="chart-title">RSS (MiB)</div>
+<div class="cw"><canvas id="cR" role="img" aria-label="RSS memory line chart"></canvas></div>
+
+<div class="chart-title">allocator used memory (MiB)&nbsp;&nbsp;<span style="font-weight:400;color:var(--color-text-tertiary)">allocator.usedDirectMemory() or allocator.usedHeapMemory()</span></div>
+<div class="cw"><canvas id="cNew" role="img" aria-label="UsedMemory chart"></canvas></div>
+
+</div>
+
+<script>
+const D=[["direct",128,"POOLED","false","E_COMMERCE",533,16397,128],["direct",128,"POOLED","true","E_COMMERCE",671,16412,128],["direct",128,"ADAPTIVE","false","E_COMMERCE",224,2297,163],["direct",128,"ADAPTIVE","true","E_COMMERCE",201,2250,159],["direct",128,"MIMALLOC","false","E_COMMERCE",172,2155,384],["direct",128,"MIMALLOC","true","E_COMMERCE",158,2150,384],["direct",1024,"POOLED","false","E_COMMERCE",755,16676,384],["direct",1024,"POOLED","true","E_COMMERCE",654,16687,384],["direct",1024,"ADAPTIVE","false","E_COMMERCE",309,2549,365],["direct",1024,"ADAPTIVE","true","E_COMMERCE",279,2539,351],["direct",1024,"MIMALLOC","false","E_COMMERCE",168,2298,512],["direct",1024,"MIMALLOC","true","E_COMMERCE",163,2285,512],["direct",4096,"POOLED","false","E_COMMERCE",574,17240,896],["direct",4096,"POOLED","true","E_COMMERCE",635,17199,896],["direct",4096,"ADAPTIVE","false","E_COMMERCE",3018,3291,872],["direct",4096,"ADAPTIVE","true","E_COMMERCE",3368,3281,876],["direct",4096,"MIMALLOC","false","E_COMMERCE",164,2804,1024],["direct",4096,"MIMALLOC","true","E_COMMERCE",163,2812,1024],["direct",8192,"POOLED","false","E_COMMERCE",643,17925,1524],["direct",8192,"POOLED","true","E_COMMERCE",799,17879,1536],["direct",8192,"ADAPTIVE","false","E_COMMERCE",4236,4001,1483],["direct",8192,"ADAPTIVE","true","E_COMMERCE",4432,4023,1484],["direct",8192,"MIMALLOC","false","E_COMMERCE",232,3484,1676],["direct",8192,"MIMALLOC","true","E_COMMERCE",195,3460,1664],["direct",16384,"POOLED","false","E_COMMERCE",818,19316,2944],["direct",16384,"POOLED","true","E_COMMERCE",668,19352,2944],["direct",16384,"ADAPTIVE","false","E_COMMERCE",5032,5522,2838],["direct",16384,"ADAPTIVE","true","E_COMMERCE",5739,5491,2827],["direct",16384,"MIMALLOC","false","E_COMMERCE",321,4791,2968],["direct",16384,"MIMALLOC","true","E_COMMERCE",275,4744,2944],["direct",32768,"POOLED","false","E_COMMERCE",859,21966,5496],["direct",32768,"POOLED","true","E_COMMERCE",1017,21974,5500],["direct",32768,"ADAPTIVE","false","E_COMMERCE",4363,8444,5454],["direct",32768,"ADAPTIVE","true","E_COMMERCE",5218,8273,5417],["direct",32768,"MIMALLOC","false","E_COMMERCE",396,7311,5468],["direct",32768,"MIMALLOC","true","E_COMMERCE",380,7311,5460],["direct",65536,"POOLED","false","E_COMMERCE",946,28230,10488],["direct",65536,"POOLED","true","E_COMMERCE",911,28236,10496],["direct",65536,"ADAPTIVE","false","E_COMMERCE",13355,13717,10627],["direct",65536,"ADAPTIVE","true","E_COMMERCE",15537,13427,10651],["direct",65536,"MIMALLOC","false","E_COMMERCE",418,12340,10368],["direct",65536,"MIMALLOC","true","E_COMMERCE",386,12346,10368],["heap",128,"POOLED","false","E_COMMERCE",545,16522,128],["heap",128,"POOLED","true","E_COMMERCE",520,16527,128],["heap",128,"ADAPTIVE","false","E_COMMERCE",185,2209,145],["heap",128,"ADAPTIVE","true","E_COMMERCE",210,2235,136],["heap",128,"MIMALLOC","false","E_COMMERCE",321,2340,384],["heap",128,"MIMALLOC","true","E_COMMERCE",172,2330,376],["heap",1024,"POOLED","false","E_COMMERCE",505,16950,384],["heap",1024,"POOLED","true","E_COMMERCE",572,16957,384],["heap",1024,"ADAPTIVE","false","E_COMMERCE",397,2540,359],["heap",1024,"ADAPTIVE","true","E_COMMERCE",237,2569,352],["heap",1024,"MIMALLOC","false","E_COMMERCE",459,2344,512],["heap",1024,"MIMALLOC","true","E_COMMERCE",293,2346,512],["heap",4096,"POOLED","false","E_COMMERCE",597,17502,888],["heap",4096,"POOLED","true","E_COMMERCE",469,17480,896],["heap",4096,"ADAPTIVE","false","E_COMMERCE",4788,17429,870],["heap",4096,"ADAPTIVE","true","E_COMMERCE",3357,17504,869],["heap",4096,"MIMALLOC","false","E_COMMERCE",314,3290,1024],["heap",4096,"MIMALLOC","true","E_COMMERCE",354,3277,1024],["heap",8192,"POOLED","false","E_COMMERCE",444,18396,1536],["heap",8192,"POOLED","true","E_COMMERCE",555,18357,1516],["heap",8192,"ADAPTIVE","false","E_COMMERCE",4189,18676,1489],["heap",8192,"ADAPTIVE","true","E_COMMERCE",6169,18497,1490],["heap",8192,"MIMALLOC","false","E_COMMERCE",378,3268,1664],["heap",8192,"MIMALLOC","true","E_COMMERCE",277,3288,1676],["heap",16384,"POOLED","false","E_COMMERCE",463,20174,2944],["heap",16384,"POOLED","true","E_COMMERCE",822,20146,2944],["heap",16384,"ADAPTIVE","false","E_COMMERCE",4487,17378,2879],["heap",16384,"ADAPTIVE","true","E_COMMERCE",4967,21759,2827],["heap",16384,"MIMALLOC","false","E_COMMERCE",556,5185,2944],["heap",16384,"MIMALLOC","true","E_COMMERCE",425,5207,2944],["heap",32768,"POOLED","false","E_COMMERCE",501,23633,5496],["heap",32768,"POOLED","true","E_COMMERCE",884,23622,5500],["heap",32768,"ADAPTIVE","false","E_COMMERCE",4426,23906,5470],["heap",32768,"ADAPTIVE","true","E_COMMERCE",4683,25008,5474],["heap",32768,"MIMALLOC","false","E_COMMERCE",812,8127,5436],["heap",32768,"MIMALLOC","true","E_COMMERCE",734,8116,5388],["heap",65536,"POOLED","false","E_COMMERCE",731,24647,10496],["heap",65536,"POOLED","true","E_COMMERCE",795,24530,10496],["heap",65536,"ADAPTIVE","false","E_COMMERCE",22542,25954,10559],["heap",65536,"ADAPTIVE","true","E_COMMERCE",16520,22509,10561],["heap",65536,"MIMALLOC","false","E_COMMERCE",594,14470,10308],["heap",65536,"MIMALLOC","true","E_COMMERCE",610,14412,10292]];
+
+
+const BUFS=[128,1024,4096,8192,16384,32768,65536];
+const AL=["POOLED","ADAPTIVE","MIMALLOC"];
+const CLR={"POOLED":"#4a7fcb","ADAPTIVE":"#2aaa6e","MIMALLOC":"#d05a2a"};
+let st={method:"direct",pattern:"E_COMMERCE",rw:"true"};
+let cL,cR;
+
+function rows(){return D.filter(r=>r[0]===st.method&&r[3]===st.rw&&r[4]===st.pattern);}
+function ds(col){
+  return AL.map(a=>{
+    const sub=rows().filter(r=>r[2]===a);
+    return{label:a,data:BUFS.map(b=>{const r=sub.find(x=>x[1]===b);return r?r[col]:null;}),
+      borderColor:CLR[a],backgroundColor:CLR[a]+"22",borderWidth:2,
+    };
+  });
+}
+function opts(ytitle){
+  return{responsive:true,maintainAspectRatio:false,animation:{duration:300},
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y!=null?Math.round(c.parsed.y):"n/a"}`}}},
+    scales:{x:{grid:{color:"rgba(128,128,128,.12)"},ticks:{font:{size:11}},title:{display:true,text:"Live buffers",font:{size:11}}},
+            y:{grid:{color:"rgba(128,128,128,.12)"},ticks:{font:{size:11}},title:{display:true,text:ytitle,font:{size:11}}}}};
+}
+function draw(){
+  const lData={labels:BUFS.map(String),datasets:ds(5)};
+  const rData={labels:BUFS.map(String),datasets:ds(6)};
+  const nData={labels:BUFS.map(String),datasets:ds(7)};
+  if(cL){cL.data=lData;cL.update();}
+  if(cR){cR.data=rData;cR.update();}
+  if (cNew) { cNew.data = nData; cNew.update(); }
+}
+
+document.querySelectorAll(".pg").forEach(g=>{
+  g.addEventListener("click",e=>{
+    const b=e.target.closest(".pill");if(!b)return;
+    g.querySelectorAll(".pill").forEach(p=>p.classList.remove("on"));
+    b.classList.add("on");
+    const id=g.id;
+    if(id==="gm")st.method=b.dataset.v;
+    if(id==="gp")st.pattern=b.dataset.v;
+    if(id==="gr")st.rw=b.dataset.v;
+    draw();
+  });
+});
+
+function loadChartJS(cb){
+  const CDNS=[
+    "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"
+  ];
+  let done=false;
+  CDNS.forEach(url=>{
+    const s=document.createElement("script");
+    s.src=url;
+    s.onload=()=>{ if(!done){ done=true; cb(); } };
+    document.head.appendChild(s);
+  });
+}
+loadChartJS(function(){
+  cL=new Chart(document.getElementById("cL"),{type:"line",data:{labels:BUFS.map(String),datasets:ds(5)},options:opts("ns/op")});
+  cR=new Chart(document.getElementById("cR"),{type:"line",data:{labels:BUFS.map(String),datasets:ds(6)},options:opts("MiB")});
+  cNew = new Chart(document.getElementById("cNew"), {
+      type: "line",
+      data: { labels: BUFS.map(String), datasets: ds(7) },
+      options: opts("MiB")
+    });
+
+  if (window.parent) parent.postMessage("charts-ready", "*");
+});
+</script>
+</body></html>' style="display:none" frameborder="0"></iframe>
+  <iframe id="f2" data-srcdoc='<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0 12px;font-family:system-ui,sans-serif}</style></head><body>
+<style>
+.ctrl-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem;align-items:flex-end}
+
+.pg{display:flex;border:0.5px solid var(--color-border-secondary, #d1d5db);border-radius:20px;overflow:hidden}
+.pill{padding:5px 14px;font-size:13px;cursor:pointer;background:transparent;border:none;color:var(--color-text-secondary, #4b5563)}
+
+.pill.on{background:var(--color-text-primary, #111827);color:var(--color-background-primary, #ffffff)}
+.slabel{font-size:11px;font-weight:500;color:var(--color-text-tertiary, #6b7280);text-transform:uppercase;margin-bottom:5px}
+.chart-title{font-size:13px;font-weight:500;color:var(--color-text-secondary, #4b5563);margin:1rem 0 4px}
+.cw{position:relative;width:100%;height:260px}
+.leg{display:flex;gap:16px;font-size:12px;color:var(--color-text-secondary, #4b5563);margin-bottom:.5rem}
+.leg span{display:flex;align-items:center;gap:5px}
+.lsq{display:inline-block;width:20px;height:3px;border-radius:2px}
+.warn{background:var(--color-background-warning, #fef08a);border:0.5px solid var(--color-border-warning, #facc15);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--color-text-warning, #854d0e);margin-bottom:1rem;display:none}
+</style>
+
+<div style="padding:18px 0 0">
+<h4 class="sr-only">32 event loop threads on X86 with 16 cores</h4>
+<hr>
+<div class="ctrl-row">
+  <div><div class="slabel">allocation</div>
+    <div class="pg" id="gm">
+      <button class="pill on" data-v="direct">direct</button>
+      <button class="pill" data-v="heap">heap</button>
+    </div></div>
+  <div><div class="slabel">pattern</div>
+    <div class="pg" id="gp">
+      <button class="pill on" data-v="E_COMMERCE">E_COMMERCE</button>
+    </div></div>
+  <div><div class="slabel">read/write</div>
+    <div class="pg" id="gr">
+      <button class="pill on" data-v="true">on</button>
+      <button class="pill" data-v="false">off</button>
+    </div></div>
+</div>
+
+<div class="leg">
+  <span><span class="lsq" style="background:#4a7fcb"></span>POOLED</span>
+  <span><span class="lsq" style="background:#2aaa6e"></span>ADAPTIVE</span>
+  <span><span class="lsq" style="background:#d05a2a"></span>MIMALLOC</span>
+</div>
+
+<div class="chart-title">Latency (ns/op)&nbsp;&nbsp;<span style="font-weight:400;color:var(--color-text-tertiary)">the lower the better</span></div>
+<div class="cw"><canvas id="cL" role="img" aria-label="Allocation latency line chart"></canvas></div>
+
+<div class="chart-title">RSS (MiB)</div>
+<div class="cw"><canvas id="cR" role="img" aria-label="RSS memory line chart"></canvas></div>
+
+<div class="chart-title">allocator used memory (MiB)&nbsp;&nbsp;<span style="font-weight:400;color:var(--color-text-tertiary)">allocator.usedDirectMemory() or allocator.usedHeapMemory()</span></div>
+<div class="cw"><canvas id="cNew" role="img" aria-label="UsedMemory chart"></canvas></div>
+
+</div>
+
+<script>
+const D=[];
+
+const BUFS=[128,1024,4096,8192,16384,32768,65536];
+const AL=["POOLED","ADAPTIVE","MIMALLOC"];
+const CLR={"POOLED":"#4a7fcb","ADAPTIVE":"#2aaa6e","MIMALLOC":"#d05a2a"};
+let st={method:"direct",pattern:"E_COMMERCE",rw:"true"};
+let cL,cR,cNew;
+
+function rows(){return D.filter(r=>r[0]===st.method&&r[3]===st.rw&&r[4]===st.pattern);}
+function ds(col){
+  return AL.map(a=>{
+    const sub=rows().filter(r=>r[2]===a);
+    return{label:a,data:BUFS.map(b=>{const r=sub.find(x=>x[1]===b);return r?r[col]:null;}),
+      borderColor:CLR[a],backgroundColor:CLR[a]+"22",borderWidth:2,
+    };
+  });
+}
+function opts(ytitle){
+  return{responsive:true,maintainAspectRatio:false,animation:{duration:300},
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y!=null?Math.round(c.parsed.y):"n/a"}`}}},
+    scales:{x:{grid:{color:"rgba(128,128,128,.12)"},ticks:{font:{size:11}},title:{display:true,text:"Live buffers",font:{size:11}}},
+            y:{grid:{color:"rgba(128,128,128,.12)"},ticks:{font:{size:11}},title:{display:true,text:ytitle,font:{size:11}}}}};
+}
+function draw(){
+  const lData={labels:BUFS.map(String),datasets:ds(5)};
+  const rData={labels:BUFS.map(String),datasets:ds(6)};
+  const nData={labels:BUFS.map(String),datasets:ds(7)};
+  if(cL){cL.data=lData;cL.update();}
+  if(cR){cR.data=rData;cR.update();}
+  if(cNew){cNew.data=nData;cNew.update();} 
+}
+
+document.querySelectorAll(".pg").forEach(g=>{
+  g.addEventListener("click",e=>{
+    const b=e.target.closest(".pill");if(!b)return;
+    g.querySelectorAll(".pill").forEach(p=>p.classList.remove("on"));
+    b.classList.add("on");
+    const id=g.id;
+    if(id==="gm")st.method=b.dataset.v;
+    if(id==="gp")st.pattern=b.dataset.v;
+    if(id==="gr")st.rw=b.dataset.v;
+    draw();
+  });
+});
+
+function loadChartJS(cb){
+  const CDNS=[
+    "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"
+  ];
+  let done=false;
+  CDNS.forEach(url=>{
+    const s=document.createElement("script");
+    s.src=url;
+    s.onload=()=>{ if(!done){ done=true; cb(); } };
+    document.head.appendChild(s);
+  });
+}
+loadChartJS(function(){
+  cL=new Chart(document.getElementById("cL"),{type:"line",data:{labels:BUFS.map(String),datasets:ds(5)},options:opts("ns/op")});
+  cR=new Chart(document.getElementById("cR"),{type:"line",data:{labels:BUFS.map(String),datasets:ds(6)},options:opts("MiB")});
+  cNew = new Chart(document.getElementById("cNew"), {
+      type: "line",
+      data: { labels: BUFS.map(String), datasets: ds(7) },
+      options: opts("MiB")
+    });
+  parent.postMessage("charts-ready", "*");
+});
+
+</script>
+</body></html>' style="display:none" frameborder="0"></iframe>
+  <iframe id="f3" data-srcdoc='<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0 12px;font-family:system-ui,sans-serif}</style></head><body>
+<style>
+.ctrl-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem;align-items:flex-end}
+
+.pg{display:flex;border:0.5px solid var(--color-border-secondary, #d1d5db);border-radius:20px;overflow:hidden}
+.pill{padding:5px 14px;font-size:13px;cursor:pointer;background:transparent;border:none;color:var(--color-text-secondary, #4b5563)}
+
+.pill.on{background:var(--color-text-primary, #111827);color:var(--color-background-primary, #ffffff)}
+.slabel{font-size:11px;font-weight:500;color:var(--color-text-tertiary, #6b7280);text-transform:uppercase;margin-bottom:5px}
+.chart-title{font-size:13px;font-weight:500;color:var(--color-text-secondary, #4b5563);margin:1rem 0 4px}
+.cw{position:relative;width:100%;height:260px}
+.leg{display:flex;gap:16px;font-size:12px;color:var(--color-text-secondary, #4b5563);margin-bottom:.5rem}
+.leg span{display:flex;align-items:center;gap:5px}
+.lsq{display:inline-block;width:20px;height:3px;border-radius:2px}
+.warn{background:var(--color-background-warning, #fef08a);border:0.5px solid var(--color-border-warning, #facc15);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--color-text-warning, #854d0e);margin-bottom:1rem;display:none}
+</style>
+
+<div style="padding:18px 0 0">
+<h4 class="sr-only">32 platform threads on X86 with 16 cores</h4>
+<hr>
+<div class="ctrl-row">
+  <div><div class="slabel">allocation</div>
+    <div class="pg" id="gm">
+      <button class="pill on" data-v="direct">direct</button>
+      <button class="pill" data-v="heap">heap</button>
+    </div></div>
+  <div><div class="slabel">pattern</div>
+    <div class="pg" id="gp">
+      <button class="pill on" data-v="E_COMMERCE">E_COMMERCE</button>
+    </div></div>
+  <div><div class="slabel">read/write</div>
+    <div class="pg" id="gr">
+      <button class="pill on" data-v="true">on</button>
+      <button class="pill" data-v="false">off</button>
+    </div></div>
+</div>
+
+<div class="leg">
+  <span><span class="lsq" style="background:#4a7fcb"></span>POOLED</span>
+  <span><span class="lsq" style="background:#2aaa6e"></span>ADAPTIVE</span>
+  <span><span class="lsq" style="background:#d05a2a"></span>MIMALLOC</span>
+</div>
+
+<div class="chart-title">Latency (ns/op)&nbsp;&nbsp;<span style="font-weight:400;color:var(--color-text-tertiary)">the lower the better</span></div>
+<div class="cw"><canvas id="cL" role="img" aria-label="Allocation latency line chart"></canvas></div>
+
+<div class="chart-title">RSS (MiB)</div>
+<div class="cw"><canvas id="cR" role="img" aria-label="RSS memory line chart"></canvas></div>
+
+<div class="chart-title">allocator used memory (MiB)&nbsp;&nbsp;<span style="font-weight:400;color:var(--color-text-tertiary)">allocator.usedDirectMemory() or allocator.usedHeapMemory()</span></div>
+<div class="cw"><canvas id="cNew" role="img" aria-label="UsedMemory chart"></canvas></div>
+
+</div>
+
+<script>
+const D=[];
+
+const BUFS=[128,1024,4096,8192,16384,32768,65536];
+const AL=["POOLED","ADAPTIVE","MIMALLOC"];
+const CLR={"POOLED":"#4a7fcb","ADAPTIVE":"#2aaa6e","MIMALLOC":"#d05a2a"};
+let st={method:"direct",pattern:"E_COMMERCE",rw:"true"};
+let cL,cR,cNew;
+
+function rows(){return D.filter(r=>r[0]===st.method&&r[3]===st.rw&&r[4]===st.pattern);}
+function ds(col){
+  return AL.map(a=>{
+    const sub=rows().filter(r=>r[2]===a);
+    return{label:a,data:BUFS.map(b=>{const r=sub.find(x=>x[1]===b);return r?r[col]:null;}),
+      borderColor:CLR[a],backgroundColor:CLR[a]+"22",borderWidth:2,
+    };
+  });
+}
+function opts(ytitle){
+  return{responsive:true,maintainAspectRatio:false,animation:{duration:300},
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y!=null?Math.round(c.parsed.y):"n/a"}`}}},
+    scales:{x:{grid:{color:"rgba(128,128,128,.12)"},ticks:{font:{size:11}},title:{display:true,text:"Live buffers",font:{size:11}}},
+            y:{grid:{color:"rgba(128,128,128,.12)"},ticks:{font:{size:11}},title:{display:true,text:ytitle,font:{size:11}}}}};
+}
+function draw(){
+  const lData={labels:BUFS.map(String),datasets:ds(5)};
+  const rData={labels:BUFS.map(String),datasets:ds(6)};
+  const nData={labels:BUFS.map(String),datasets:ds(7)};
+  if(cL){cL.data=lData;cL.update();}
+  if(cR){cR.data=rData;cR.update();}
+  if(cNew){cNew.data=nData;cNew.update();} 
+}
+
+document.querySelectorAll(".pg").forEach(g=>{
+  g.addEventListener("click",e=>{
+    const b=e.target.closest(".pill");if(!b)return;
+    g.querySelectorAll(".pill").forEach(p=>p.classList.remove("on"));
+    b.classList.add("on");
+    const id=g.id;
+    if(id==="gm")st.method=b.dataset.v;
+    if(id==="gp")st.pattern=b.dataset.v;
+    if(id==="gr")st.rw=b.dataset.v;
+    draw();
+  });
+});
+
+function loadChartJS(cb){
+  const CDNS=[
+    "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"
+  ];
+  let done=false;
+  CDNS.forEach(url=>{
+    const s=document.createElement("script");
+    s.src=url;
+    s.onload=()=>{ if(!done){ done=true; cb(); } };
+    document.head.appendChild(s);
+  });
+}
+loadChartJS(function(){
+  cL=new Chart(document.getElementById("cL"),{type:"line",data:{labels:BUFS.map(String),datasets:ds(5)},options:opts("ns/op")});
+  cR=new Chart(document.getElementById("cR"),{type:"line",data:{labels:BUFS.map(String),datasets:ds(6)},options:opts("MiB")});
+  cNew = new Chart(document.getElementById("cNew"), {
+      type: "line",
+      data: { labels: BUFS.map(String), datasets: ds(7) },
+      options: opts("MiB")
+    });
+  if (window.parent) parent.postMessage("charts-ready", "*");
+});
+</script>
+</body></html>' style="display:none" frameborder="0"></iframe>
+</main>
+
+<script>
+const btns = document.querySelectorAll(".nav-btn");
+const frames = document.querySelectorAll("iframe");
+
+function show(btn, i) {
+  btns.forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  frames.forEach((f, j) => {
+    if (j === i) {
+      if (!f.srcdoc) f.srcdoc = f.dataset.srcdoc;
+      f.style.display = "block";
+    } else {
+      f.style.display = "none";
+    }
+  });
+}
+
+window.addEventListener('message', e => {
+  if (e.data === 'charts-ready') {
+    const el = document.getElementById('loading');
+    el.style.opacity = '0';
+    el.style.transition = 'opacity .3s';
+    setTimeout(() => el.remove(), 300);
+  }
+});
+
+// click first button on laod.
+btns[0].click();
+</script>
+</body>
+</html>
