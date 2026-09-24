@@ -24,6 +24,7 @@ toc: false
 <details>
       <summary>ARM server: 16 cores, 60 GB ram.</summary>
 <pre>
+lscpu
 Architecture:                aarch64
   CPU op-mode(s):            64-bit
   Byte Order:                Little Endian
@@ -31,16 +32,16 @@ CPU(s):                      16
   On-line CPU(s) list:       0-15
 Vendor ID:                   ARM
   Model name:                Neoverse-V2
-    BIOS Model name:         Axion  CPU @ 3.0GHz
-    BIOS CPU family:         257
     Model:                   1
     Thread(s) per core:      1
     Core(s) per socket:      16
     Socket(s):               1
     Stepping:                r0p1
     BogoMIPS:                2000.00
-    Flags:                   fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 sm3 sm4 asimddp sha512 sve asimdfhm dit usca
-                             t ilrcpc flagm sb paca pacg dcpodp sve2 sveaes svepmull svebitperm svesha3 svesm4 flagm2 frint svei8mm svebf16 i8mm bf16 dgh rng bti
+    Flags:                   fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jsc
+                             vt fcma lrcpc dcpop sha3 sm3 sm4 asimddp sha512 sve asimdfhm dit uscat ilrcpc flag
+                             m sb paca pacg dcpodp sve2 sveaes svepmull svebitperm svesha3 svesm4 flagm2 frint 
+                             svei8mm svebf16 i8mm bf16 dgh rng bti
 Caches (sum of all):         
   L1d:                       1 MiB (16 instances)
   L1i:                       1 MiB (16 instances)
@@ -66,6 +67,7 @@ Vulnerabilities:
   Srbds:                     Not affected
   Tsa:                       Not affected
   Tsx async abort:           Not affected
+  Vmscape:                   Not affected
       </pre>
   </details>  
   <br>
